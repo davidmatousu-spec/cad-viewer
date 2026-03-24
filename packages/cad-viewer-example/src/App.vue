@@ -38,7 +38,8 @@ const remoteFileUrl = urlParams.get('url')
 
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
-  store.selectedFile = new File([], 'remote.dwg')
+  const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
+store.selectedFile = new File([], fileName)
 }
 
 const initialize = () => {
