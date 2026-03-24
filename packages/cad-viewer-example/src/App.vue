@@ -56,7 +56,10 @@ const initialize = () => {
       const layer = db.tables.layerTable.getAt('Zóny - razítko SP')
       if (layer) {
         layer.isOff = true
-        AcApDocManager.instance.regen()
+        // Delay regen to run after onAfterOpenDocument finishes setActiveLayout()
+        setTimeout(() => {
+          AcApDocManager.instance.regen()
+        }, 100)
       }
     } catch (e) {
       console.warn('Auto-hide layer failed:', e)
