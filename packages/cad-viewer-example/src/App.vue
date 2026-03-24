@@ -19,7 +19,6 @@
 </template>
 
 <script setup lang="ts">
-// import { AcApSettingManager } from '@mlightcad/cad-simple-viewer'
 import {
   AcApDocManager,
   AcEdCommandStack,
@@ -33,38 +32,41 @@ import FileUpload from './components/FileUpload.vue'
 import { initializeLocale } from './locale'
 import { store } from './store'
 
+// --- AUTO-LOAD z ?url= parametru ---
+const urlParams = new URLSearchParams(window.location.search)
+const remoteFileUrl = urlParams.get('url')
+
+// Pokud je ?url=, přeskoč upload screen
+if (remoteFileUrl) {
+  store.selectedFile = new File([], 'remote.dwg')
+}
+
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
   register.addCommand(
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
-    'quit',
-    'quit',
-    new AcApQuitCmd()
+    'quit', 'quit', new AcApQuitCmd()
   )
   register.addCommand(
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
-    'exit',
-    'exit',
-    new AcApQuitCmd()
+    'exit', 'exit', new AcApQuitCmd()
   )
-}
 
-// Decide whether to show command line vertical toolbar at the right side,
-// performance stats, coordinates in status bar, etc.
-// AcApSettingManager.instance.isShowCommandLine = false
-// AcApSettingManager.instance.isShowToolbar = false
-// AcApSettingManager.instance.isShowStats = false
-// AcApSettingManager.instance.isShowCoordinate = false
+  // Auto-load soubor z URL parametru
+  if (remoteFileUrl) {
+    void AcApDocManager.instance.openUrl(remoteFileUrl)
+  }
+}
 
 const selectedMode = ref<AcEdOpenMode>(AcEdOpenMode.Read)
 
-// Handle file selection from upload component
 const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
   store.selectedFile = file
   selectedMode.value = mode
 }
 </script>
+
 
 <style scoped>
 #app-root {
