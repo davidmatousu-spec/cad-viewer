@@ -53,13 +53,29 @@ const initialize = () => {
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
     'exit', 'exit', new AcApQuitCmd()
   )
-
-  // Auto-load soubor z URL parametru
+  // Po načtení dokumentu vypni vrstvu "Zóny - razítko SP"
+  AcApDocManager.instance.events.documentCreated.add(() => {
+    try {
+      const db = AcApDocManager.instance.curDocument.database
+      const layerTable = db.getLayerTable()
+      if (layerTable) {
+        for (let i = 0; i < layerTable.size(); i++) {
+          const layer = layerTable.getAt(i)
+          if (layer && layer.getName() === 'Zóny - razítko SP') {
+            layer.setIsOff(true)
+          }
+        }
+        AcApDocManager.instance.regen()
+      }
+    } catch (e) {
+      console.warn('Auto-hide layer failed:', e)
+    }
+  })
+  // Auto-load z URL parametru
   if (remoteFileUrl) {
     void AcApDocManager.instance.openUrl(remoteFileUrl)
   }
 }
-
 const selectedMode = ref<AcEdOpenMode>(AcEdOpenMode.Read)
 
 const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
