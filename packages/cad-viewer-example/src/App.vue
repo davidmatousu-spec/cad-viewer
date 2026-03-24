@@ -49,22 +49,26 @@ const initialize = () => {
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
     'exit', 'exit', new AcApQuitCmd()
   )
-  // Po načtení dokumentu automaticky vypni vrstvu "Zóny - razítko SP"
-  AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
-    try {
-      const db = args.doc.database
-      const layer = db.tables.layerTable.getAt('Zóny - razítko SP')
+  // Vrstvy k automatickému vypnutí
+const hiddenLayers = ['Zóny - razítko SP', 'Další vrstva', 'Ještě jedna']
+AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
+  try {
+    const db = args.doc.database
+    let changed = false
+    for (const name of hiddenLayers) {
+      const layer = db.tables.layerTable.getAt(name)
       if (layer) {
         layer.isOff = true
-        // Delay regen to run after onAfterOpenDocument finishes setActiveLayout()
-        setTimeout(() => {
-          AcApDocManager.instance.regen()
-        }, 100)
+        changed = true
       }
-    } catch (e) {
-      console.warn('Auto-hide layer failed:', e)
     }
-  })
+    if (changed) {
+      setTimeout(() => AcApDocManager.instance.regen(), 100)
+    }
+  } catch (e) {
+    console.warn('Auto-hide layer failed:', e)
+  }
+})
   // Auto-load soubor z URL parametru
   if (remoteFileUrl) {
     void AcApDocManager.instance.openUrl(remoteFileUrl)
