@@ -26,22 +26,18 @@ import {
 } from '@mlightcad/cad-simple-viewer'
 import { MlCadViewer } from '@mlightcad/cad-viewer'
 import { ref } from 'vue'
-
 import { AcApQuitCmd } from './commands'
 import FileUpload from './components/FileUpload.vue'
 import { initializeLocale } from './locale'
 import { store } from './store'
-
 // --- AUTO-LOAD z ?url= parametru ---
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
-
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
   const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
-store.selectedFile = new File([], fileName)
+  store.selectedFile = new File([], fileName)
 }
-
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
@@ -53,38 +49,30 @@ const initialize = () => {
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
     'exit', 'exit', new AcApQuitCmd()
   )
-  // Po načtení dokumentu vypni vrstvu "Zóny - razítko SP"
-  AcApDocManager.instance.events.documentCreated.add(() => {
+  // Po načtení dokumentu automaticky vypni vrstvu "Zóny - razítko SP"
+  AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
     try {
-      const db = AcApDocManager.instance.curDocument.database
-      const layerTable = db.getLayerTable()
-      if (layerTable) {
-        for (let i = 0; i < layerTable.size(); i++) {
-          const layer = layerTable.getAt(i)
-          if (layer && layer.getName() === 'Zóny - razítko SP') {
-            layer.setIsOff(true)
-          }
-        }
+      const db = args.doc.database
+      const layer = db.tables.layerTable.getAt('Zóny - razítko SP')
+      if (layer) {
+        layer.isOff = true
         AcApDocManager.instance.regen()
       }
     } catch (e) {
       console.warn('Auto-hide layer failed:', e)
     }
   })
-  // Auto-load z URL parametru
+  // Auto-load soubor z URL parametru
   if (remoteFileUrl) {
     void AcApDocManager.instance.openUrl(remoteFileUrl)
   }
 }
 const selectedMode = ref<AcEdOpenMode>(AcEdOpenMode.Read)
-
 const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
   store.selectedFile = file
   selectedMode.value = mode
 }
 </script>
-
-
 <style scoped>
 #app-root {
   height: 100vh;
