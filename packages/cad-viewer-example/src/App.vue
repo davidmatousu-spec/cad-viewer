@@ -61,44 +61,24 @@ function invertWhiteColors(db: any) {
     records.forEach((layer: any, name: string) => {
       try {
         const color = layer.color
-        if (!color) return
-
-        // Zkontrolujeme jestli je barva bílá (true color)
-        // ACI 7 se invertuje automaticky, nechceme na něj sahat
-        const ci = color.colorIndex
-        if (ci === 7) return // viewer to řeší sám
-
-        // Zjistíme RGB hodnoty
-        const r = color.red ?? color.r
-        const g = color.green ?? color.g
-        const b = color.blue ?? color.b
-
-        // Pokud je barva bílá nebo velmi světlá (> 240 na všech kanálech)
-        if (r !== undefined && g !== undefined && b !== undefined) {
-          if (r > 240 && g > 240 && b > 240) {
-            console.log(`Layer "${name}": white color (${r},${g},${b}) → black`)
-            // Přenastavíme na černou
-            if (typeof color.setRGB === 'function') {
-              color.setRGB(0, 0, 0)
-            } else if (typeof color.setColor === 'function') {
-              color.setColor(0, 0, 0)
-            } else {
-              // Přímé nastavení vlastností
-              if ('red' in color) { color.red = 0; color.green = 0; color.blue = 0 }
-              if ('r' in color) { color.r = 0; color.g = 0; color.b = 0 }
-              // Pokusíme se nastavit colorIndex na černou (ACI 0 nebo jiný)
-              if ('colorIndex' in color && ci === 7) {
-                color.colorIndex = 0
-              }
-            }
-          }
+        if (!color) {
+          console.log(`Layer "${name}": NO color property`)
+          return
         }
+        // Logujeme detailní strukturu barvy
+        console.log(`Layer "${name}":`, {
+          colorIndex: color.colorIndex,
+          red: color.red, green: color.green, blue: color.blue,
+          r: color.r, g: color.g, b: color.b,
+          keys: Object.keys(color),
+          ownProps: Object.getOwnPropertyNames(color),
+          protoMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(color)),
+          raw: color
+        })
       } catch (e) {
-        // Ignorujeme chyby na jednotlivých vrstvách
+        console.log(`Layer "${name}": error reading color`, e)
       }
     })
-
-    console.log(`Processed ${records.size} layers for white→black conversion`)
   } catch (e) {
     console.warn('invertWhiteColors failed:', e)
   }
