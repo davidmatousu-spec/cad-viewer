@@ -46,10 +46,18 @@ if (remoteFileUrl) {
  * Záporné = vykreslí se dříve (vzadu), kladné = navrch.
  */
 const LAYER_RENDER_ORDER: Record<string, number> = {
-  '2D prvky - obecné': -100,       // bílé výplně – úplně vzadu
+  '2D prvky - obecné': 100,       // bílé výplně – úplně vzadu
   'Výplně – Řezové': -90,          // řezové výplně vzadu
   'Výplně - Povrchové': -80,       // povrchové výplně vzadu
-  'Kóty - SP': 100,                // kóty navrch
+  'Konstrukce - svislé nosné': 0, 
+  'Otvory – Dveře': 105, 
+  'Otvory – Okna': 106, 
+  'Otvory – Značky dveří': 107, 
+  'Otvory – Značky oken': 108, 
+  'Značky - detaily': 108, 
+  'Značky - pohledy': 108, 
+  'Značky - řezy': 108, 
+  'Kóty - SP': 150,                // kóty navrch
   'Anotace - SP': 110,             // anotace navrch
 }
 
