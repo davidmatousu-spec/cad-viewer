@@ -1,5 +1,5 @@
 <template>
-  <div id="app-root" :class="{ 'light-mode': isLightMode }">
+  <div id="app-root">
     <!-- Upload screen when no file is selected -->
     <div v-if="!store.selectedFile" class="upload-screen">
       <FileUpload @file-select="handleFileSelect" />
@@ -11,7 +11,8 @@
         locale="en"
         :local-file="store.selectedFile"
         :mode="selectedMode"
-        :theme="isLightMode ? 'light' : 'dark'"
+        :background="viewerBackground"
+        :theme="viewerTheme"
         @create="initialize"
         base-url="https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/"
       />
@@ -36,8 +37,10 @@ import { store } from './store'
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
 
-// Theme z URL parametru (?theme=light → invertovaný pohled)
+// Theme z URL parametru
 const isLightMode = urlParams.get('theme') === 'light'
+const viewerTheme = isLightMode ? 'light' : 'dark'
+const viewerBackground = isLightMode ? 0xFFFFFF : 0x000000
 
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
@@ -70,6 +73,23 @@ const initialize = () => {
           changed = true
         }
       }
+
+      // === DEBUG: zjistíme strukturu layerTable ===
+      const lt = db.tables.layerTable
+      console.log('=== layerTable DEBUG ===')
+      console.log('typeof layerTable:', typeof lt)
+      console.log('constructor:', lt?.constructor?.name)
+      console.log('Object.keys:', Object.keys(lt))
+      console.log('Object.getOwnPropertyNames:', Object.getOwnPropertyNames(lt))
+      console.log('prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(lt)))
+      // Zkusíme prototype chain hlouběji
+      const proto2 = Object.getPrototypeOf(Object.getPrototypeOf(lt))
+      if (proto2 && proto2 !== Object.prototype) {
+        console.log('prototype2 methods:', Object.getOwnPropertyNames(proto2))
+      }
+      console.log('layerTable value:', lt)
+      console.log('=== END DEBUG ===')
+
       if (changed) {
         setTimeout(() => AcApDocManager.instance.regen(), 100)
       }
@@ -95,11 +115,6 @@ const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
 #app-root {
   height: 100vh;
   position: fixed;
-}
-
-/* Invertuje pouze Three.js canvas (výkres), ne UI prvky */
-#app-root.light-mode :deep(canvas) {
-  filter: invert(1) hue-rotate(180deg);
 }
 
 .upload-screen {
