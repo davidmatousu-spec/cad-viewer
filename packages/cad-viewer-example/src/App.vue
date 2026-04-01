@@ -45,44 +45,6 @@ if (remoteFileUrl) {
   store.selectedFile = new File([], fileName)
 }
 
-/**
- * Přebarví ACI 7 (white) vrstvy na explicitní černou RGB(0,0,0).
- * Místo spolehání na viewer automatickou inverzi ACI 7, nastavíme barvu natvrdo.
- */
-function forceBlackOnWhiteLayers(db: any) {
-  if (!isLightMode) return
-  try {
-    const records = db.tables.layerTable._recordsByName as Map<string, any>
-    let changed = 0
-
-    records.forEach((layer: any, name: string) => {
-      try {
-        const color = layer.color
-        if (!color) return
-
-        // Pokud je ACI 7 (foreground/white) nebo explicitní bílá → nastavíme černou
-        const ci = color.colorIndex
-        const isFg = color.isForeground === true
-        const r = color.red, g = color.green, b = color.blue
-
-        if (isFg || ci === 7 || (r !== undefined && r > 240 && g > 240 && b > 240)) {
-          color.setRGB(0, 0, 0)
-          changed++
-          console.log(`Layer "${name}": → forced to black`)
-        }
-      } catch (e) {
-        // skip
-      }
-    })
-
-    if (changed > 0) {
-      console.log(`Forced ${changed} layers from white/ACI7 to black`)
-    }
-  } catch (e) {
-    console.warn('forceBlackOnWhiteLayers failed:', e)
-  }
-}
-
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
@@ -108,16 +70,64 @@ const initialize = () => {
           changed = true
         }
       }
-
-      // Přebarvi bílé/ACI7 vrstvy na explicitní černou
-      forceBlackOnWhiteLayers(db)
-
-      // Vždy regenerujeme v light modu
-      if (changed || isLightMode) {
-        setTimeout(() => AcApDocManager.instance.regen(), 200)
+      if (changed) {
+        setTimeout(() => AcApDocManager.instance.regen(), 100)
       }
     } catch (e) {
-      console.warn('documentActivated error:', e)
+      console.warn('Auto-hide layer failed:', e)
+    }
+
+    // === DEBUG: Hledáme přístup k Three.js scéně/rendereru ===
+    if (isLightMode) {
+      setTimeout(() => {
+        const dm = AcApDocManager.instance as any
+        console.log('=== DocManager DEBUG ===')
+        console.log('dm own:', Object.getOwnPropertyNames(dm))
+        console.log('dm proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(dm)))
+        const proto2 = Object.getPrototypeOf(Object.getPrototypeOf(dm))
+        if (proto2 && proto2 !== Object.prototype) {
+          console.log('dm proto2:', Object.getOwnPropertyNames(proto2))
+        }
+
+        const doc = dm.activeDocument || args.doc
+        if (doc) {
+          console.log('doc own:', Object.getOwnPropertyNames(doc))
+          console.log('doc proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(doc)))
+          const docProto2 = Object.getPrototypeOf(Object.getPrototypeOf(doc))
+          if (docProto2 && docProto2 !== Object.prototype) {
+            console.log('doc proto2:', Object.getOwnPropertyNames(docProto2))
+          }
+        }
+
+        // Zkusíme najít view/scene/renderer přímo
+        for (const key of Object.getOwnPropertyNames(dm)) {
+          const val = dm[key]
+          if (val && typeof val === 'object' && val.constructor) {
+            console.log(`dm.${key} type:`, val.constructor.name)
+          }
+        }
+        if (doc) {
+          for (const key of Object.getOwnPropertyNames(doc)) {
+            const val = doc[key]
+            if (val && typeof val === 'object' && val.constructor) {
+              console.log(`doc.${key} type:`, val.constructor.name)
+            }
+          }
+        }
+
+        // Zkusíme najít Three.js scénu přes canvas
+        const canvas = document.querySelector('canvas')
+        if (canvas) {
+          console.log('canvas found, keys:', Object.keys(canvas))
+          // Check for Three.js internals
+          for (const key of Object.getOwnPropertyNames(canvas)) {
+            if (key.startsWith('__')) {
+              console.log(`canvas.${key}:`, typeof (canvas as any)[key])
+            }
+          }
+        }
+        console.log('=== END DEBUG ===')
+      }, 3000)
     }
   })
 
