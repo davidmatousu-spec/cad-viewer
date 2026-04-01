@@ -11,6 +11,8 @@
         locale="en"
         :local-file="store.selectedFile"
         :mode="selectedMode"
+        :background="viewerBackground"
+        :theme="viewerTheme"
         @create="initialize"
         base-url="https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/"
       />
@@ -30,14 +32,22 @@ import { AcApQuitCmd } from './commands'
 import FileUpload from './components/FileUpload.vue'
 import { initializeLocale } from './locale'
 import { store } from './store'
+
 // --- AUTO-LOAD z ?url= parametru ---
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
+
+// Theme z URL parametru (?theme=light → bílé pozadí, černé čáry)
+const themeParam = urlParams.get('theme')
+const viewerTheme = themeParam === 'light' ? 'light' : 'dark'
+const viewerBackground = themeParam === 'light' ? 0xFFFFFF : 0x000000
+
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
   const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
   store.selectedFile = new File([], fileName)
 }
+
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
@@ -49,37 +59,41 @@ const initialize = () => {
     AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
     'exit', 'exit', new AcApQuitCmd()
   )
+
   // Vrstvy k automatickému vypnutí
-const hiddenLayers = ['Zóny - razítko SP', 'Další vrstva', 'Ještě jedna']
-AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
-  try {
-    const db = args.doc.database
-    let changed = false
-    for (const name of hiddenLayers) {
-      const layer = db.tables.layerTable.getAt(name)
-      if (layer) {
-        layer.isOff = true
-        changed = true
+  const hiddenLayers = ['Zóny - razítko SP', 'Další vrstva', 'Ještě jedna']
+  AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
+    try {
+      const db = args.doc.database
+      let changed = false
+      for (const name of hiddenLayers) {
+        const layer = db.tables.layerTable.getAt(name)
+        if (layer) {
+          layer.isOff = true
+          changed = true
+        }
       }
+      if (changed) {
+        setTimeout(() => AcApDocManager.instance.regen(), 100)
+      }
+    } catch (e) {
+      console.warn('Auto-hide layer failed:', e)
     }
-    if (changed) {
-      setTimeout(() => AcApDocManager.instance.regen(), 100)
-    }
-  } catch (e) {
-    console.warn('Auto-hide layer failed:', e)
-  }
-})
+  })
+
   // Auto-load soubor z URL parametru
   if (remoteFileUrl) {
     void AcApDocManager.instance.openUrl(remoteFileUrl)
   }
 }
+
 const selectedMode = ref<AcEdOpenMode>(AcEdOpenMode.Read)
 const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
   store.selectedFile = file
   selectedMode.value = mode
 }
 </script>
+
 <style scoped>
 #app-root {
   height: 100vh;
@@ -99,6 +113,6 @@ const handleFileSelect = (file: File, mode: AcEdOpenMode) => {
   top: 0;
   left: 0;
   z-index: 1000;
-  pointer-events: auto; /* Allow clicks on upload screen */
+  pointer-events: auto;
 }
 </style>
