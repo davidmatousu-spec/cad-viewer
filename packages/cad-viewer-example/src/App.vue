@@ -104,7 +104,7 @@ const initialize = () => {
     'exit', 'exit', new AcApQuitCmd()
   )
 
-  const hiddenLayers = ['Zóny - razítko SP', 'Další vrstva', 'Ještě jedna']
+  const hiddenLayers = ['Další vrstva', 'Ještě jedna']
   AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
     try {
       const db = args.doc.database
