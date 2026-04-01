@@ -47,7 +47,7 @@ if (remoteFileUrl) {
  */
 const LAYER_RENDER_ORDER: Record<string, number> = {
   '2D prvky - obecné': 100,       // bílé výplně – úplně vzadu
-  'Výplně – Řezové': -90,          // řezové výplně vzadu
+  'Výplně – Řezové': 10,          // řezové výplně vzadu
   'Výplně - Povrchové': -80,       // povrchové výplně vzadu
   'Konstrukce - svislé nosné': 0, 
   'Otvory – Dveře': 105, 
