@@ -51,50 +51,27 @@ function fixWhiteInThreeScene() {
   if (!view) return
   const scene = view.internalScene
   if (!scene) return
-  let matChanged = 0
-  let vtxChanged = 0
-  const typeStats = new Map<string, number>()
+  let changed = 0
   scene.traverse((obj: any) => {
-    const type = obj.type || obj.constructor?.name || 'unknown'
-    // 1. Materiálové barvy - VŠECHNY objekty
+    const type = obj.type || obj.constructor?.name
+    // Přeskočíme Mesh (výplně/hatche) → zůstanou bílé
+    if (type === 'Mesh') return
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of mats) {
         if (mat?.color && mat.color.r > 0.93 && mat.color.g > 0.93 && mat.color.b > 0.93) {
-          console.log(`White material on: ${type}, matType: ${mat.type}`)
           mat.color.setHex(0x000000)
           mat.needsUpdate = true
-          matChanged++
-          typeStats.set(type, (typeStats.get(type) || 0) + 1)
+          changed++
         }
-      }
-    }
-    // 2. Vertex barvy - VŠECHNY objekty
-    if (obj.geometry?.attributes?.color) {
-      const attr = obj.geometry.attributes.color
-      const arr = attr.array
-      let geomDirty = false
-      let count = 0
-      for (let i = 0; i < arr.length; i += attr.itemSize) {
-        if (arr[i] > 0.93 && arr[i + 1] > 0.93 && arr[i + 2] > 0.93) {
-          arr[i] = 0; arr[i + 1] = 0; arr[i + 2] = 0
-          geomDirty = true
-          count++
-        }
-      }
-      if (geomDirty) {
-        attr.needsUpdate = true
-        vtxChanged += count
-        console.log(`White vertices on: ${type}, count: ${count}`)
-        typeStats.set(type + '(vtx)', (typeStats.get(type + '(vtx)') || 0) + count)
       }
     }
   })
-  console.log(`Fixed: ${matChanged} materials, ${vtxChanged} vertices`)
-  console.log('Type stats:', Object.fromEntries(typeStats))
-  view._isDirty = true
+  if (changed) {
+    console.log(`Fixed ${changed} white line/point materials → black`)
+    view._isDirty = true
+  }
 }
-
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
