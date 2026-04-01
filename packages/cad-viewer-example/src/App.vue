@@ -52,36 +52,33 @@ function fixWhiteInThreeScene() {
   const scene = view.internalScene
   if (!scene) return
   const sceneWrapper = view._scene
-  // === Prozkoumat _layers ===
-  const layers = sceneWrapper._layers
-  console.log('=== LAYERS ===')
-  console.log('layers type:', layers?.constructor?.name)
-  if (layers instanceof Map) {
-    layers.forEach((val: any, key: string) => {
-      const type = val?.type || val?.constructor?.name
-      const kids = val?.children?.length || 0
-      console.log(`  Layer "${key}" → ${type} [${kids} children]`)
-    })
-  } else if (layers && typeof layers === 'object') {
-    for (const [key, val] of Object.entries(layers) as any) {
-      const type = val?.type || val?.constructor?.name
-      const kids = val?.children?.length || 0
-      console.log(`  Layer "${key}" → ${type} [${kids} children]`)
+  const layers = sceneWrapper._layers as Map<string, any>
+  // === DEBUG: Struktura jednoho layer entry ===
+  const testLayer = layers.get('Kóty - SP')
+  if (testLayer) {
+    console.log('=== Layer entry "Kóty - SP" ===')
+    console.log('own:', Object.getOwnPropertyNames(testLayer))
+    console.log('proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(testLayer)))
+    for (const key of Object.getOwnPropertyNames(testLayer)) {
+      const val = testLayer[key]
+      const vtype = val?.constructor?.name || typeof val
+      console.log(`  .${key} = ${vtype}`)
     }
   }
-  console.log('=== END LAYERS ===')
-  // === Render order: "Kóty - SP" a vybrané vrstvy navrch ===
-  const topLayers = ['Kóty - SP', 'Anotace - SP']
-  if (layers instanceof Map) {
-    layers.forEach((group: any, name: string) => {
-      if (topLayers.includes(name) && group) {
-        group.renderOrder = 100
-        group.traverse?.((child: any) => { child.renderOrder = 100 })
-        console.log(`Layer "${name}" → renderOrder 100 (on top)`)
-      }
-    })
+  // === DEBUG: Skupiny v Three.js scéně - zjistíme strukturu ===
+  // Třetí group (Model Space?) - 20 children = 20 vrstev?
+  for (let g = 0; g < scene.children.length; g++) {
+    const group = scene.children[g]
+    if (group.children?.length === 20) {
+      console.log(`=== Layout group [${g}] - 20 sub-groups ===`)
+      group.children.forEach((sub: any, i: number) => {
+        const types = sub.children?.map((c: any) => c.type || c.constructor?.name) || []
+        console.log(`  [${i}] ${types.join(', ')} (${sub.children?.length || 0} objects)`)
+      })
+      break // stačí jedna layout
+    }
   }
-  // === Bílé výplně vzadu, bílé čáry → černé ===
+  // === Zatím: bílé výplně vzadu, bílé čáry černé ===
   let changed = 0
   scene.traverse((obj: any) => {
     const type = obj.type || obj.constructor?.name
