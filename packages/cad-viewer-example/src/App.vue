@@ -49,41 +49,43 @@ function fixWhiteInThreeScene() {
   const dm = AcApDocManager.instance as any
   const view = dm.curView
   if (!view) return
-
   const scene = view.internalScene
   if (!scene) return
-
-  // === DEBUG: Zjistíme strukturu scény ===
-  console.log('=== Scene structure ===')
-  for (const child of scene.children) {
-    const type = child.type || child.constructor?.name
-    const name = child.name || '(unnamed)'
-    const kids = child.children?.length || 0
-    console.log(`  ${type} "${name}" [${kids} children]`)
-    // Jeden level hlouběji
-    if (child.children) {
-      for (const sub of child.children.slice(0, 5)) {
-        const stype = sub.type || sub.constructor?.name
-        const sname = sub.name || '(unnamed)'
-        const skids = sub.children?.length || 0
-        console.log(`    └ ${stype} "${sname}" [${skids} children]`)
-      }
-      if (child.children.length > 5) console.log(`    └ ... +${child.children.length - 5} more`)
+  const sceneWrapper = view._scene
+  // === Prozkoumat _layers ===
+  const layers = sceneWrapper._layers
+  console.log('=== LAYERS ===')
+  console.log('layers type:', layers?.constructor?.name)
+  if (layers instanceof Map) {
+    layers.forEach((val: any, key: string) => {
+      const type = val?.type || val?.constructor?.name
+      const kids = val?.children?.length || 0
+      console.log(`  Layer "${key}" → ${type} [${kids} children]`)
+    })
+  } else if (layers && typeof layers === 'object') {
+    for (const [key, val] of Object.entries(layers) as any) {
+      const type = val?.type || val?.constructor?.name
+      const kids = val?.children?.length || 0
+      console.log(`  Layer "${key}" → ${type} [${kids} children]`)
     }
   }
-
-  // Zkusíme také scénu wrapper
-  const sceneWrapper = view._scene
-  console.log('sceneWrapper own:', Object.getOwnPropertyNames(sceneWrapper))
-  console.log('sceneWrapper proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(sceneWrapper)))
-  console.log('=== END structure ===')
-
-  // === Přebarvení bílých čar na černé ===
+  console.log('=== END LAYERS ===')
+  // === Render order: "Kóty - SP" a vybrané vrstvy navrch ===
+  const topLayers = ['Kóty - SP', 'Anotace - SP']
+  if (layers instanceof Map) {
+    layers.forEach((group: any, name: string) => {
+      if (topLayers.includes(name) && group) {
+        group.renderOrder = 100
+        group.traverse?.((child: any) => { child.renderOrder = 100 })
+        console.log(`Layer "${name}" → renderOrder 100 (on top)`)
+      }
+    })
+  }
+  // === Bílé výplně vzadu, bílé čáry → černé ===
   let changed = 0
   scene.traverse((obj: any) => {
     const type = obj.type || obj.constructor?.name
     if (type === 'Mesh') {
-      // Bílé výplně → renderOrder -100 (vzadu)
       if (obj.material?.color) {
         const c = obj.material.color
         if (c.r > 0.93 && c.g > 0.93 && c.b > 0.93) {
@@ -92,8 +94,6 @@ function fixWhiteInThreeScene() {
       }
       return
     }
-
-    // Bílé čáry/body → černé
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of mats) {
@@ -105,7 +105,6 @@ function fixWhiteInThreeScene() {
       }
     }
   })
-
   console.log(`Fixed ${changed} white materials → black`)
   view._isDirty = true
 }
