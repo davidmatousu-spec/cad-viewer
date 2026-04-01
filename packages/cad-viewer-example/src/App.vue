@@ -48,16 +48,16 @@ if (remoteFileUrl) {
 function fixWhiteInThreeScene() {
   const dm = AcApDocManager.instance as any
   const view = dm.curView
-  if (!view) { console.warn('No curView'); return }
-
+  if (!view) return
   const scene = view.internalScene
-  if (!scene) { console.warn('No internalScene'); return }
-
+  if (!scene) return
   let matChanged = 0
   let vtxChanged = 0
-
   scene.traverse((obj: any) => {
-    // 1. Opravíme materiálové barvy (bílá → černá)
+    // Pouze ČÁRY a BODY – výplně (Mesh) přeskočíme → zůstanou bílé
+    const isLineType = obj.isLine || obj.isLineSegments || obj.isLineLoop || obj.isPoints
+    if (!isLineType) return
+    // 1. Materiálové barvy
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of mats) {
@@ -68,15 +68,13 @@ function fixWhiteInThreeScene() {
         }
       }
     }
-
-    // 2. Opravíme vertex barvy v BufferGeometry (bílá → černá)
+    // 2. Vertex barvy
     if (obj.geometry?.attributes?.color) {
       const attr = obj.geometry.attributes.color
       const arr = attr.array
       let geomDirty = false
       for (let i = 0; i < arr.length; i += attr.itemSize) {
-        const r = arr[i], g = arr[i + 1], b = arr[i + 2]
-        if (r > 0.93 && g > 0.93 && b > 0.93) {
+        if (arr[i] > 0.93 && arr[i + 1] > 0.93 && arr[i + 2] > 0.93) {
           arr[i] = 0; arr[i + 1] = 0; arr[i + 2] = 0
           geomDirty = true
           vtxChanged++
@@ -85,10 +83,7 @@ function fixWhiteInThreeScene() {
       if (geomDirty) attr.needsUpdate = true
     }
   })
-
-  console.log(`Three.js fix: ${matChanged} materials, ${vtxChanged} vertices changed white→black`)
-
-  // Vynutíme překreslení
+  console.log(`Three.js fix: ${matChanged} line materials, ${vtxChanged} line vertices → black (meshes untouched)`)
   view._isDirty = true
 }
 
