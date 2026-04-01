@@ -46,19 +46,19 @@ if (remoteFileUrl) {
  * Záporné = vykreslí se dříve (vzadu), kladné = navrch.
  */
 const LAYER_RENDER_ORDER: Record<string, number> = {
-  '2D prvky - obecné': 100,       // bílé výplně – úplně vzadu
-  'Výplně – Řezové': 10,          // řezové výplně vzadu
-  'Výplně - Povrchové': -80,       // povrchové výplně vzadu
-  'Konstrukce - svislé nosné': 0, 
-  'Otvory – Dveře': 105, 
-  'Otvory – Okna': 106, 
-  'Otvory – Značky dveří': 107, 
-  'Otvory – Značky oken': 108, 
-  'Značky - detaily': 108, 
-  'Značky - pohledy': 108, 
-  'Značky - řezy': 108, 
-  'Kóty - SP': 150,                // kóty navrch
-  'Anotace - SP': 110,             // anotace navrch
+  '2D prvky - obecné': 100,
+  'Výplně – Řezové': 10,
+  'Výplně - Povrchové': -80,
+  'Konstrukce - svislé nosné': 0,
+  'Otvory – Dveře': 105,
+  'Otvory – Okna': 106,
+  'Otvory – Značky dveří': 107,
+  'Otvory – Značky oken': 108,
+  'Značky - detaily': 108,
+  'Značky - pohledy': 108,
+  'Značky - řezy': 108,
+  'Kóty - SP': 150,
+  'Anotace - SP': 110,
 }
 
 /**
@@ -88,11 +88,9 @@ function fixWhiteInThreeScene() {
 
       const order = LAYER_RENDER_ORDER[layerName]
       if (order !== undefined) {
-        // Nastavíme renderOrder na všechny objekty ve vrstvě
         layerGroup.renderOrder = order
         layerGroup.traverse((child: any) => {
           child.renderOrder = order
-          // Pro vrstvy navrch: zajistíme že se vykreslí vždy
           if (order > 0 && child.material) {
             const mats = Array.isArray(child.material) ? child.material : [child.material]
             mats.forEach((m: any) => {
@@ -158,6 +156,13 @@ const initialize = () => {
       console.warn('Auto-hide layer failed:', e)
     }
 
+    // Zoom fit po načtení dokumentu
+    setTimeout(() => {
+      const view = (AcApDocManager.instance as any).curView
+      if (view?.zoomToFitDrawing) view.zoomToFitDrawing()
+    }, 1000)
+
+    // Light mode: přebarvení bílých čar a nastavení render orderu
     if (isLightMode) {
       setTimeout(() => fixWhiteInThreeScene(), 4000)
       setTimeout(() => fixWhiteInThreeScene(), 8000)
