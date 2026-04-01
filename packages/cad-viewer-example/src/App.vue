@@ -51,11 +51,31 @@ function fixWhiteInThreeScene() {
   if (!view) return
   const scene = view.internalScene
   if (!scene) return
-  let changed = 0
+  // Krok 1: Najdeme bílé výplně a nastavíme je na renderOrder -100 (vykreslí se první/vzadu)
+  const whiteFillParents = new Set()
   scene.traverse((obj: any) => {
     const type = obj.type || obj.constructor?.name
-    // Přeskočíme Mesh (výplně/hatche) → zůstanou bílé
+    if (type !== 'Mesh') return
+    if (obj.material?.color) {
+      const c = obj.material.color
+      if (c.r > 0.93 && c.g > 0.93 && c.b > 0.93) {
+        obj.renderOrder = -100
+        // Zapamatujeme si parent – čáry ve stejné skupině jsou pravděpodobně okraje výplně
+        if (obj.parent) whiteFillParents.add(obj.parent)
+      }
+    }
+  })
+  // Krok 2: Přebarvíme bílé čáry na černé, ALE přeskočíme ty ve stejné skupině jako bílé výplně
+  let changed = 0
+  let skipped = 0
+  scene.traverse((obj: any) => {
+    const type = obj.type || obj.constructor?.name
     if (type === 'Mesh') return
+    // Čáry ve stejné skupině jako bílá výplň → necháme bílé (okraje výplně)
+    if (whiteFillParents.has(obj.parent)) {
+      skipped++
+      return
+    }
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of mats) {
@@ -67,11 +87,10 @@ function fixWhiteInThreeScene() {
       }
     }
   })
-  if (changed) {
-    console.log(`Fixed ${changed} white line/point materials → black`)
-    view._isDirty = true
-  }
+  console.log(`Fixed ${changed} line materials → black, skipped ${skipped} border objects, ${whiteFillParents.size} fill groups`)
+  view._isDirty = true
 }
+  
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
