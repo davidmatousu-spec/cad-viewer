@@ -8,8 +8,8 @@
         locale="en"
         :local-file="store.selectedFile"
         :mode="selectedMode"
-        :background="0xFFFFFF"
-        theme="light"
+        :background="viewerBackground"
+        :theme="viewerTheme"
         @create="initialize"
         base-url="https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/"
       />
@@ -30,72 +30,66 @@ import FileUpload from './components/FileUpload.vue'
 import { initializeLocale } from './locale'
 import { store } from './store'
 
-// --- AUTO-LOAD z ?url= parametru ---
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
 const isLightMode = urlParams.get('theme') === 'light'
+const viewerTheme = isLightMode ? 'light' : 'dark'
+const viewerBackground = isLightMode ? 0xFFFFFF : 0x000000
 
-// Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
   const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
   store.selectedFile = new File([], fileName)
 }
 
 /**
- * Po načtení dokumentu vynutíme přeřešení ACI 7 barev
- * a prozkoumáme Three.js scénu pro úpravu bílých čar.
+ * Přímo v Three.js scéně přebarví bílé materiály na černé.
+ * Výplně/hatche (tmavé barvy) zůstanou nedotčené.
  */
-function fixWhiteLinesForLightMode() {
+function fixWhiteInThreeScene() {
   const dm = AcApDocManager.instance as any
+  const view = dm.curView
+  if (!view) { console.warn('No curView'); return }
 
-  // 1. Zkusíme resolveAci7ForBackground - vynutí přepočet ACI 7 na černou
-  try {
-    console.log('Calling resolveAci7ForBackground(0xFFFFFF)...')
-    const result = dm.resolveAci7ForBackground(0xFFFFFF)
-    console.log('resolveAci7ForBackground result:', result)
-  } catch (e) {
-    console.warn('resolveAci7ForBackground failed:', e)
-  }
+  const scene = view.internalScene
+  if (!scene) { console.warn('No internalScene'); return }
 
-  // 2. Zkusíme resolveColors
-  try {
-    console.log('Calling resolveColors...')
-    if (typeof dm.resolveColors === 'function') {
-      dm.resolveColors()
-      console.log('resolveColors called')
-    }
-  } catch (e) {
-    console.warn('resolveColors failed:', e)
-  }
+  let matChanged = 0
+  let vtxChanged = 0
 
-  // 3. Prozkoumáme curView a Three.js scénu
-  try {
-    const view = dm.curView
-    if (view) {
-      console.log('curView type:', view.constructor?.name)
-      console.log('curView own:', Object.getOwnPropertyNames(view))
-      console.log('curView proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(view)))
-      const proto2 = Object.getPrototypeOf(Object.getPrototypeOf(view))
-      if (proto2 && proto2 !== Object.prototype) {
-        console.log('curView proto2:', Object.getOwnPropertyNames(proto2))
-      }
-      // Hledáme scene/renderer
-      for (const key of Object.getOwnPropertyNames(view)) {
-        const val = view[key]
-        if (val && typeof val === 'object' && val.constructor) {
-          console.log(`view.${key} type:`, val.constructor.name)
+  scene.traverse((obj: any) => {
+    // 1. Opravíme materiálové barvy (bílá → černá)
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+      for (const mat of mats) {
+        if (mat?.color && mat.color.r > 0.93 && mat.color.g > 0.93 && mat.color.b > 0.93) {
+          mat.color.setHex(0x000000)
+          mat.needsUpdate = true
+          matChanged++
         }
       }
     }
-  } catch (e) {
-    console.warn('curView exploration failed:', e)
-  }
 
-  // 4. Regen
-  setTimeout(() => {
-    AcApDocManager.instance.regen()
-    console.log('regen() called after resolveAci7')
-  }, 300)
+    // 2. Opravíme vertex barvy v BufferGeometry (bílá → černá)
+    if (obj.geometry?.attributes?.color) {
+      const attr = obj.geometry.attributes.color
+      const arr = attr.array
+      let geomDirty = false
+      for (let i = 0; i < arr.length; i += attr.itemSize) {
+        const r = arr[i], g = arr[i + 1], b = arr[i + 2]
+        if (r > 0.93 && g > 0.93 && b > 0.93) {
+          arr[i] = 0; arr[i + 1] = 0; arr[i + 2] = 0
+          geomDirty = true
+          vtxChanged++
+        }
+      }
+      if (geomDirty) attr.needsUpdate = true
+    }
+  })
+
+  console.log(`Three.js fix: ${matChanged} materials, ${vtxChanged} vertices changed white→black`)
+
+  // Vynutíme překreslení
+  view._isDirty = true
 }
 
 const initialize = () => {
@@ -110,7 +104,6 @@ const initialize = () => {
     'exit', 'exit', new AcApQuitCmd()
   )
 
-  // Vrstvy k automatickému vypnutí
   const hiddenLayers = ['Zóny - razítko SP', 'Další vrstva', 'Ještě jedna']
   AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
     try {
@@ -130,13 +123,14 @@ const initialize = () => {
       console.warn('Auto-hide layer failed:', e)
     }
 
-    // V light modu po 3s (po dorendování) opravíme bílé čáry
+    // Po 4s (po dorendování) opravíme bílé barvy přímo v Three.js
     if (isLightMode) {
-      setTimeout(() => fixWhiteLinesForLightMode(), 3000)
+      setTimeout(() => fixWhiteInThreeScene(), 4000)
+      // Záloha pro pomalé soubory
+      setTimeout(() => fixWhiteInThreeScene(), 8000)
     }
   })
 
-  // Auto-load soubor z URL parametru
   if (remoteFileUrl) {
     void AcApDocManager.instance.openUrl(remoteFileUrl)
   }
