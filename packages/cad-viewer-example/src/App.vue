@@ -42,55 +42,67 @@ if (remoteFileUrl) {
 }
 
 /**
- * Přímo v Three.js scéně přebarví bílé materiály na černé.
- * Výplně/hatche (tmavé barvy) zůstanou nedotčené.
+ * Konfigurace renderOrder per vrstva.
+ * Záporné = vykreslí se dříve (vzadu), kladné = navrch.
+ */
+const LAYER_RENDER_ORDER: Record<string, number> = {
+  '2D prvky - obecné': -100,       // bílé výplně – úplně vzadu
+  'Výplně – Řezové': -90,          // řezové výplně vzadu
+  'Výplně - Povrchové': -80,       // povrchové výplně vzadu
+  'Kóty - SP': 100,                // kóty navrch
+  'Anotace - SP': 110,             // anotace navrch
+}
+
+/**
+ * Oprava barev a render orderu přímo v Three.js scéně.
+ * - Bílé čáry/body → černé (výplně zůstanou bílé)
+ * - Render order podle LAYER_RENDER_ORDER
  */
 function fixWhiteInThreeScene() {
   const dm = AcApDocManager.instance as any
   const view = dm.curView
   if (!view) return
+
   const scene = view.internalScene
   if (!scene) return
   const sceneWrapper = view._scene
   const layers = sceneWrapper._layers as Map<string, any>
-  // === DEBUG: Struktura jednoho layer entry ===
-  const testLayer = layers.get('Kóty - SP')
-  if (testLayer) {
-    console.log('=== Layer entry "Kóty - SP" ===')
-    console.log('own:', Object.getOwnPropertyNames(testLayer))
-    console.log('proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(testLayer)))
-    for (const key of Object.getOwnPropertyNames(testLayer)) {
-      const val = testLayer[key]
-      const vtype = val?.constructor?.name || typeof val
-      console.log(`  .${key} = ${vtype}`)
-    }
+  const layerNames = [...layers.keys()]
+
+  // 1. Render order per vrstva
+  let orderCount = 0
+  for (const layoutGroup of scene.children) {
+    if (!layoutGroup.children || layoutGroup.children.length !== layerNames.length) continue
+
+    layoutGroup.children.forEach((layerGroup: any, index: number) => {
+      const layerName = layerNames[index]
+      if (!layerName) return
+
+      const order = LAYER_RENDER_ORDER[layerName]
+      if (order !== undefined) {
+        // Nastavíme renderOrder na všechny objekty ve vrstvě
+        layerGroup.renderOrder = order
+        layerGroup.traverse((child: any) => {
+          child.renderOrder = order
+          // Pro vrstvy navrch: zajistíme že se vykreslí vždy
+          if (order > 0 && child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material]
+            mats.forEach((m: any) => {
+              if (m) m.depthTest = false
+            })
+          }
+        })
+        orderCount++
+      }
+    })
   }
-  // === DEBUG: Skupiny v Three.js scéně - zjistíme strukturu ===
-  // Třetí group (Model Space?) - 20 children = 20 vrstev?
-  for (let g = 0; g < scene.children.length; g++) {
-    const group = scene.children[g]
-    if (group.children?.length === 20) {
-      console.log(`=== Layout group [${g}] - 20 sub-groups ===`)
-      group.children.forEach((sub: any, i: number) => {
-        const types = sub.children?.map((c: any) => c.type || c.constructor?.name) || []
-        console.log(`  [${i}] ${types.join(', ')} (${sub.children?.length || 0} objects)`)
-      })
-      break // stačí jedna layout
-    }
-  }
-  // === Zatím: bílé výplně vzadu, bílé čáry černé ===
+
+  // 2. Bílé čáry/body → černé (Mesh přeskočíme = výplně zůstanou bílé)
   let changed = 0
   scene.traverse((obj: any) => {
     const type = obj.type || obj.constructor?.name
-    if (type === 'Mesh') {
-      if (obj.material?.color) {
-        const c = obj.material.color
-        if (c.r > 0.93 && c.g > 0.93 && c.b > 0.93) {
-          obj.renderOrder = -100
-        }
-      }
-      return
-    }
+    if (type === 'Mesh') return
+
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of mats) {
@@ -102,11 +114,11 @@ function fixWhiteInThreeScene() {
       }
     }
   })
-  console.log(`Fixed ${changed} white materials → black`)
+
+  console.log(`Light mode fix: ${orderCount} layers reordered, ${changed} white→black`)
   view._isDirty = true
 }
 
-  
 const initialize = () => {
   initializeLocale()
   const register = AcApDocManager.instance.commandManager
@@ -119,7 +131,7 @@ const initialize = () => {
     'exit', 'exit', new AcApQuitCmd()
   )
 
-  const hiddenLayers = ['Zóny - razítko SP', 'Ještě jedna']
+  const hiddenLayers = ['Zóny - razítko SP']
   AcApDocManager.instance.events.documentActivated.addEventListener((args) => {
     try {
       const db = args.doc.database
@@ -138,10 +150,8 @@ const initialize = () => {
       console.warn('Auto-hide layer failed:', e)
     }
 
-    // Po 4s (po dorendování) opravíme bílé barvy přímo v Three.js
     if (isLightMode) {
       setTimeout(() => fixWhiteInThreeScene(), 4000)
-      // Záloha pro pomalé soubory
       setTimeout(() => fixWhiteInThreeScene(), 8000)
     }
   })
