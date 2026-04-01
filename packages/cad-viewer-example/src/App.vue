@@ -41,11 +41,84 @@ const remoteFileUrl = urlParams.get('url')
 const themeParam = urlParams.get('theme')
 const viewerTheme = themeParam === 'light' ? 'light' : 'dark'
 const viewerBackground = themeParam === 'light' ? 0xFFFFFF : 0x000000
+const isLightMode = themeParam === 'light'
 
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
   const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
   store.selectedFile = new File([], fileName)
+}
+
+/**
+ * Přebarví bílé vrstvy na černé v light modu.
+ * ACI 7 se invertuje automaticky (viewer to řeší),
+ * ale explicitní true-color bílé (255,255,255) zůstanou bílé.
+ */
+function invertWhiteLayerColors(db: any) {
+  if (!isLightMode) return
+  try {
+    const layerTable = db.tables.layerTable
+    // Pokusíme se iterovat přes layerTable
+    // layerTable by měl být iterable nebo mít forEach
+    const tryIterate = (table: any) => {
+      // Varianta 1: Symbol.iterator
+      if (typeof table[Symbol.iterator] === 'function') {
+        for (const layer of table) {
+          swapWhiteColor(layer)
+        }
+        return true
+      }
+      // Varianta 2: forEach
+      if (typeof table.forEach === 'function') {
+        table.forEach((layer: any) => swapWhiteColor(layer))
+        return true
+      }
+      // Varianta 3: records property
+      if (table.records) {
+        for (const layer of table.records) {
+          swapWhiteColor(layer)
+        }
+        return true
+      }
+      return false
+    }
+
+    if (!tryIterate(layerTable)) {
+      console.warn('Nelze iterovat layerTable – neznámé API')
+    }
+  } catch (e) {
+    console.warn('invertWhiteLayerColors failed:', e)
+  }
+}
+
+function swapWhiteColor(layer: any) {
+  try {
+    const color = layer.color
+    if (!color) return
+
+    // Zjistíme jestli je barva bílá
+    const isWhite =
+      // ACI color index 7 (viewer řeší automaticky, ale pro jistotu)
+      color.colorIndex === 7 ||
+      // Explicitní true color bílá
+      (color.red === 255 && color.green === 255 && color.blue === 255) ||
+      // Případně přes isForeground flag
+      color.isForeground
+
+    if (isWhite && color.colorIndex !== 7) {
+      // Jen true-color bílou přebarvíme na černou
+      // ACI 7 viewer invertuje sám
+      if (typeof color.setRGB === 'function') {
+        color.setRGB(0, 0, 0)
+      } else {
+        color.red = 0
+        color.green = 0
+        color.blue = 0
+      }
+    }
+  } catch (e) {
+    // Ignorujeme jednotlivé chyby
+  }
 }
 
 const initialize = () => {
@@ -73,7 +146,11 @@ const initialize = () => {
           changed = true
         }
       }
-      if (changed) {
+
+      // Přebarvi bílé vrstvy na černé v light modu
+      invertWhiteLayerColors(db)
+
+      if (changed || isLightMode) {
         setTimeout(() => AcApDocManager.instance.regen(), 100)
       }
     } catch (e) {
