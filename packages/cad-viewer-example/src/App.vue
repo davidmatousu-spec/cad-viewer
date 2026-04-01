@@ -1,11 +1,8 @@
 <template>
   <div id="app-root">
-    <!-- Upload screen when no file is selected -->
     <div v-if="!store.selectedFile" class="upload-screen">
       <FileUpload @file-select="handleFileSelect" />
     </div>
-
-    <!-- CAD viewer when file is selected -->
     <div v-else>
       <MlCadViewer
         locale="en"
@@ -49,38 +46,40 @@ if (remoteFileUrl) {
 }
 
 /**
- * Projde všechny vrstvy a přebarví bílé (true-color) na černé.
- * ACI 7 viewer invertuje automaticky, ale explicitní bílou (255,255,255) ne.
+ * Přebarví ACI 7 (white) vrstvy na explicitní černou RGB(0,0,0).
+ * Místo spolehání na viewer automatickou inverzi ACI 7, nastavíme barvu natvrdo.
  */
-function invertWhiteColors(db: any) {
+function forceBlackOnWhiteLayers(db: any) {
   if (!isLightMode) return
   try {
-    const lt = db.tables.layerTable
-    const records = lt._recordsByName as Map<string, any>
+    const records = db.tables.layerTable._recordsByName as Map<string, any>
+    let changed = 0
 
     records.forEach((layer: any, name: string) => {
       try {
         const color = layer.color
-        if (!color) {
-          console.log(`Layer "${name}": NO color property`)
-          return
+        if (!color) return
+
+        // Pokud je ACI 7 (foreground/white) nebo explicitní bílá → nastavíme černou
+        const ci = color.colorIndex
+        const isFg = color.isForeground === true
+        const r = color.red, g = color.green, b = color.blue
+
+        if (isFg || ci === 7 || (r !== undefined && r > 240 && g > 240 && b > 240)) {
+          color.setRGB(0, 0, 0)
+          changed++
+          console.log(`Layer "${name}": → forced to black`)
         }
-        // Logujeme detailní strukturu barvy
-        console.log(`Layer "${name}":`, {
-          colorIndex: color.colorIndex,
-          red: color.red, green: color.green, blue: color.blue,
-          r: color.r, g: color.g, b: color.b,
-          keys: Object.keys(color),
-          ownProps: Object.getOwnPropertyNames(color),
-          protoMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(color)),
-          raw: color
-        })
       } catch (e) {
-        console.log(`Layer "${name}": error reading color`, e)
+        // skip
       }
     })
+
+    if (changed > 0) {
+      console.log(`Forced ${changed} layers from white/ACI7 to black`)
+    }
   } catch (e) {
-    console.warn('invertWhiteColors failed:', e)
+    console.warn('forceBlackOnWhiteLayers failed:', e)
   }
 }
 
@@ -110,14 +109,15 @@ const initialize = () => {
         }
       }
 
-      // Přebarvi bílé vrstvy na černé v light modu
-      invertWhiteColors(db)
+      // Přebarvi bílé/ACI7 vrstvy na explicitní černou
+      forceBlackOnWhiteLayers(db)
 
+      // Vždy regenerujeme v light modu
       if (changed || isLightMode) {
         setTimeout(() => AcApDocManager.instance.regen(), 200)
       }
     } catch (e) {
-      console.warn('Auto-hide layer failed:', e)
+      console.warn('documentActivated error:', e)
     }
   })
 
