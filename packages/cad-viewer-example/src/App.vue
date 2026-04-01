@@ -8,8 +8,8 @@
         locale="en"
         :local-file="store.selectedFile"
         :mode="selectedMode"
-        :background="viewerBackground"
-        :theme="viewerTheme"
+        :background="0xFFFFFF"
+        theme="light"
         @create="initialize"
         base-url="https://cdn.jsdelivr.net/gh/mlightcad/cad-data@main/"
       />
@@ -33,16 +33,69 @@ import { store } from './store'
 // --- AUTO-LOAD z ?url= parametru ---
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
-
-// Theme z URL parametru
 const isLightMode = urlParams.get('theme') === 'light'
-const viewerTheme = isLightMode ? 'light' : 'dark'
-const viewerBackground = isLightMode ? 0xFFFFFF : 0x000000
 
 // Pokud je ?url=, přeskoč upload screen
 if (remoteFileUrl) {
   const fileName = remoteFileUrl.split('/').pop()?.split('?')[0] || 'vykresy.dwg'
   store.selectedFile = new File([], fileName)
+}
+
+/**
+ * Po načtení dokumentu vynutíme přeřešení ACI 7 barev
+ * a prozkoumáme Three.js scénu pro úpravu bílých čar.
+ */
+function fixWhiteLinesForLightMode() {
+  const dm = AcApDocManager.instance as any
+
+  // 1. Zkusíme resolveAci7ForBackground - vynutí přepočet ACI 7 na černou
+  try {
+    console.log('Calling resolveAci7ForBackground(0xFFFFFF)...')
+    const result = dm.resolveAci7ForBackground(0xFFFFFF)
+    console.log('resolveAci7ForBackground result:', result)
+  } catch (e) {
+    console.warn('resolveAci7ForBackground failed:', e)
+  }
+
+  // 2. Zkusíme resolveColors
+  try {
+    console.log('Calling resolveColors...')
+    if (typeof dm.resolveColors === 'function') {
+      dm.resolveColors()
+      console.log('resolveColors called')
+    }
+  } catch (e) {
+    console.warn('resolveColors failed:', e)
+  }
+
+  // 3. Prozkoumáme curView a Three.js scénu
+  try {
+    const view = dm.curView
+    if (view) {
+      console.log('curView type:', view.constructor?.name)
+      console.log('curView own:', Object.getOwnPropertyNames(view))
+      console.log('curView proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(view)))
+      const proto2 = Object.getPrototypeOf(Object.getPrototypeOf(view))
+      if (proto2 && proto2 !== Object.prototype) {
+        console.log('curView proto2:', Object.getOwnPropertyNames(proto2))
+      }
+      // Hledáme scene/renderer
+      for (const key of Object.getOwnPropertyNames(view)) {
+        const val = view[key]
+        if (val && typeof val === 'object' && val.constructor) {
+          console.log(`view.${key} type:`, val.constructor.name)
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('curView exploration failed:', e)
+  }
+
+  // 4. Regen
+  setTimeout(() => {
+    AcApDocManager.instance.regen()
+    console.log('regen() called after resolveAci7')
+  }, 300)
 }
 
 const initialize = () => {
@@ -77,57 +130,9 @@ const initialize = () => {
       console.warn('Auto-hide layer failed:', e)
     }
 
-    // === DEBUG: Hledáme přístup k Three.js scéně/rendereru ===
+    // V light modu po 3s (po dorendování) opravíme bílé čáry
     if (isLightMode) {
-      setTimeout(() => {
-        const dm = AcApDocManager.instance as any
-        console.log('=== DocManager DEBUG ===')
-        console.log('dm own:', Object.getOwnPropertyNames(dm))
-        console.log('dm proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(dm)))
-        const proto2 = Object.getPrototypeOf(Object.getPrototypeOf(dm))
-        if (proto2 && proto2 !== Object.prototype) {
-          console.log('dm proto2:', Object.getOwnPropertyNames(proto2))
-        }
-
-        const doc = dm.activeDocument || args.doc
-        if (doc) {
-          console.log('doc own:', Object.getOwnPropertyNames(doc))
-          console.log('doc proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(doc)))
-          const docProto2 = Object.getPrototypeOf(Object.getPrototypeOf(doc))
-          if (docProto2 && docProto2 !== Object.prototype) {
-            console.log('doc proto2:', Object.getOwnPropertyNames(docProto2))
-          }
-        }
-
-        // Zkusíme najít view/scene/renderer přímo
-        for (const key of Object.getOwnPropertyNames(dm)) {
-          const val = dm[key]
-          if (val && typeof val === 'object' && val.constructor) {
-            console.log(`dm.${key} type:`, val.constructor.name)
-          }
-        }
-        if (doc) {
-          for (const key of Object.getOwnPropertyNames(doc)) {
-            const val = doc[key]
-            if (val && typeof val === 'object' && val.constructor) {
-              console.log(`doc.${key} type:`, val.constructor.name)
-            }
-          }
-        }
-
-        // Zkusíme najít Three.js scénu přes canvas
-        const canvas = document.querySelector('canvas')
-        if (canvas) {
-          console.log('canvas found, keys:', Object.keys(canvas))
-          // Check for Three.js internals
-          for (const key of Object.getOwnPropertyNames(canvas)) {
-            if (key.startsWith('__')) {
-              console.log(`canvas.${key}:`, typeof (canvas as any)[key])
-            }
-          }
-        }
-        console.log('=== END DEBUG ===')
-      }, 3000)
+      setTimeout(() => fixWhiteLinesForLightMode(), 3000)
     }
   })
 
