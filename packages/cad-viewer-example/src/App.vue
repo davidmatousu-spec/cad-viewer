@@ -32,7 +32,7 @@ import { store } from './store'
 
 const urlParams = new URLSearchParams(window.location.search)
 const remoteFileUrl = urlParams.get('url')
-const isLightMode = urlParams.get('theme') === 'light'
+const isLightMode = urlParams.get('theme') !== 'dark'
 const viewerTheme = isLightMode ? 'light' : 'dark'
 const viewerBackground = isLightMode ? 0xFFFFFF : 0x000000
 
