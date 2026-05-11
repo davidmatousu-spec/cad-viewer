@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 
 # pnpm is bundled with Node 22 via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
