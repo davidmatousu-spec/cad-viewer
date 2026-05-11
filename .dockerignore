@@ -1,0 +1,10 @@
+node_modules
+.git
+dist
+*.md
+.changeset
+.github
+.gitlab-ci.yml
+typedoc.json
+typedoc.base.jsonc
+jest.config.ts
