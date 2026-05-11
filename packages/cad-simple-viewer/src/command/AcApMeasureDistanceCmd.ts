@@ -14,7 +14,7 @@ import {
   AcEdPromptPointOptions
 } from '../editor'
 import { AcApI18n } from '../i18n'
-import { makeBadge, makeDot, makeLiveBadge, measurementColor } from '../util'
+import { formatDistance, makeBadge, makeDot, makeLiveBadge, measurementColor } from '../util'
 import { AcTrView2d } from '../view'
 import { registerMeasurementCleanup } from './AcApClearMeasurementsCmd'
 
@@ -64,7 +64,7 @@ export class AcApMeasureDistanceJig extends AcEdPreviewJig<AcGePoint3dLike> {
       return
     }
 
-    this._badge.textContent = `~ ${dist.toFixed(3)} m`
+    this._badge.textContent = formatDistance(dist)
     this._badge.style.display = 'block'
 
     const mid = { x: (this._p1.x + p2.x) / 2, y: (this._p1.y + p2.y) / 2 }
@@ -127,7 +127,7 @@ export class AcApMeasureDistanceCmd extends AcEdCommand {
     htManager.add(`${id}-dot2`, makeDot(color), p2, 'measurement')
     htManager.add(
       `${id}-badge`,
-      makeBadge(color, `~ ${dist.toFixed(3)} m`),
+      makeBadge(color, formatDistance(dist)),
       mid,
       'measurement'
     )

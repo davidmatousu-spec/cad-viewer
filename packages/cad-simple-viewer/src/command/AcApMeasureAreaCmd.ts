@@ -17,6 +17,7 @@ import { AcApI18n } from '../i18n'
 import {
   colorToCssAlpha,
   cssColor,
+  formatArea,
   makeBadge,
   makeDot,
   makeLiveBadge,
@@ -249,7 +250,7 @@ export class AcApMeasureAreaCmd extends AcEdCommand {
           if (points.length < 2) return
           const tempPts = [...points, cursor]
           const area = shoelaceArea(tempPts)
-          liveBadge.textContent = `~ ${area.toFixed(3)} m²`
+          liveBadge.textContent = formatArea(area)
           liveBadge.style.display = ''
           const mid = centroid(tempPts)
           const rect = context.view.canvas.getBoundingClientRect()
@@ -323,7 +324,7 @@ export class AcApMeasureAreaCmd extends AcEdCommand {
 
     htManager.add(
       `${id}-badge`,
-      makeBadge(color, `~ ${area.toFixed(3)} m²`),
+      makeBadge(color, formatArea(area)),
       mid,
       'measurement'
     )

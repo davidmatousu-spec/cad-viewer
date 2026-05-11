@@ -94,6 +94,43 @@ export function makeSnapIndicator(c: AcCmColor): HTMLDivElement {
 }
 
 /**
+ * Formats a distance value (in DWG world units) for display.
+ *
+ * DWG files typically store coordinates in millimeters (INSUNITS=4).
+ * The `@mlightcad/data-model` library does not currently expose the
+ * $INSUNITS header variable, so we treat all world units as **millimeters**
+ * — which matches the convention used in Czech construction/architecture
+ * drawings.
+ *
+ * If the upstream library adds INSUNITS support in the future, this
+ * function can be extended to accept a database parameter and convert
+ * dynamically.
+ *
+ * @param value - Raw distance in DWG world units (assumed mm)
+ * @param decimals - Number of decimal places (default 1)
+ */
+export function formatDistance(value: number, decimals = 1): string {
+  return `~ ${value.toFixed(decimals)} mm`
+}
+
+/**
+ * Formats an area value (in DWG world units²) for display.
+ *
+ * Same assumption as {@link formatDistance}: world units are millimeters,
+ * so area is in mm². For readability, large areas are shown in m².
+ *
+ * @param value - Raw area in DWG world units² (assumed mm²)
+ * @param decimals - Number of decimal places (default 3)
+ */
+export function formatArea(value: number, decimals = 3): string {
+  // 1 m² = 1_000_000 mm²
+  if (value >= 1_000_000) {
+    return `~ ${(value / 1_000_000).toFixed(decimals)} m²`
+  }
+  return `~ ${value.toFixed(decimals)} mm²`
+}
+
+/**
  * Creates a canvas overlay for drawing measurement graphics (arcs, fills, etc.).
  * Appended to the given container with position:absolute.
  * Caller is responsible for calling `.remove()` when done.

@@ -17,6 +17,7 @@ import {
 import { AcApI18n } from '../i18n'
 import {
   cssColor,
+  formatDistance,
   makeBadge,
   makeDot,
   makeLiveBadge,
@@ -335,7 +336,7 @@ export class AcApMeasureArcCmd extends AcEdCommand {
       drawArcOnCanvas(arcCanvas, context.view, geom, start, snapped, color)
 
       const len = shortArcLength(start, snapped, geom)
-      liveBadge.textContent = `~ ${len.toFixed(4)} m`
+      liveBadge.textContent = formatDistance(len)
       liveBadge.style.display = ''
 
       const mid = shortArcMid(start, snapped, geom)
@@ -389,7 +390,7 @@ export class AcApMeasureArcCmd extends AcEdCommand {
     htManager.add(`${id}-dot2`, makeDot(color), end, 'measurement')
     htManager.add(
       `${id}-badge`,
-      makeBadge(color, `~ ${arcLen.toFixed(4)} m`),
+      makeBadge(color, formatDistance(arcLen)),
       mid,
       'measurement'
     )
